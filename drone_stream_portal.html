@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agrocast Analytics — Live Streaming XK</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* brand greens, pushed electric for HUD glow */
+  --g2:#0d7a5f;--g3:#16c79a;--g4:#4dffc3;
+  --cy:#22d3ee;              /* HUD cyan accent */
+  --bg:#05080a;--bg2:#070c0f;
+  --surf:rgba(12,20,24,.78);--surf2:rgba(18,28,33,.72);--surf3:rgba(28,44,50,.8);
+  --border:rgba(77,255,195,.13);--border2:rgba(77,255,195,.28);
+  --text:#dff5ec;--muted:#6e9c91;--dim:#3e5f58;
+  --red:#ff3b5c;--amber:#ffb340;--blue:#4895ef;
+  --radius:4px;--radius-sm:3px;
+  --shadow:0 8px 40px rgba(0,0,0,.6);
+  --glow:0 0 14px rgba(22,199,154,.4);
+  --scan:rgba(77,255,195,.05);
+  --panel-hd:linear-gradient(180deg,rgba(10,18,21,.95),rgba(8,14,17,.88));
+  --panel-side:linear-gradient(180deg,rgba(10,17,20,.9),rgba(6,11,13,.94));
+  --panel-card-hd:linear-gradient(180deg,rgba(18,30,34,.9),rgba(12,20,24,.8));
+  --field-bg:rgba(5,10,12,.6);
+  --header-bg:rgba(8,14,17,.94);
+}
+[data-theme="light"]{
+  --bg:#eef3f0;--bg2:#e6ece9;
+  --surf:rgba(255,255,255,.9);--surf2:rgba(245,249,247,.9);--surf3:rgba(233,241,237,.95);
+  --border:rgba(13,122,95,.18);--border2:rgba(13,122,95,.34);
+  --text:#0b2019;--muted:#3e6b5d;--dim:#7ba193;
+  --g4:#0d7a5f;
+  --scan:rgba(13,122,95,.04);
+  --glow:0 0 12px rgba(13,122,95,.18);
+  --panel-hd:linear-gradient(180deg,rgba(255,255,255,.96),rgba(248,251,249,.92));
+  --panel-side:linear-gradient(180deg,rgba(255,255,255,.94),rgba(245,249,247,.96));
+  --panel-card-hd:linear-gradient(180deg,rgba(240,247,244,.96),rgba(230,240,236,.92));
+  --field-bg:rgba(255,255,255,.75);
+  --header-bg:rgba(255,255,255,.9);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{height:100%;overflow:hidden;}
+body{
+  position:fixed;inset:0;width:100%;
+  font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height:100%;overflow:hidden;
+  /* faint technical grid + corner vignettes = "instrument panel" ground */
+  background-image:
+    linear-gradient(var(--scan) 1px,transparent 1px),
+    linear-gradient(90deg,var(--scan) 1px,transparent 1px),
+    radial-gradient(ellipse at 15% 0%,rgba(22,199,154,.07) 0%,transparent 55%),
+    radial-gradient(ellipse at 85% 100%,rgba(34,211,238,.05) 0%,transparent 55%);
+  background-size:44px 44px,44px 44px,100% 100%,100% 100%;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:0;}
+::-webkit-scrollbar-thumb:hover{background:var(--g3);}
+::selection{background:rgba(22,199,154,.3);color:var(--g4);}
+
+/* HUD corner brackets — the signature framing element */
+.hud{position:relative;}
+.hud::before,.hud::after{
+  content:'';position:absolute;width:9px;height:9px;pointer-events:none;
+  border-color:var(--g3);opacity:.55;transition:opacity .2s;
+}
+.hud::before{top:-1px;left:-1px;border-top:1.5px solid;border-left:1.5px solid;}
+.hud::after{bottom:-1px;right:-1px;border-bottom:1.5px solid;border-right:1.5px solid;}
+.mono{font-family:'JetBrains Mono',monospace;}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:300;overflow:hidden;}
+.login-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse at 25% 75%,rgba(22,199,154,.16) 0%,transparent 55%),
+    radial-gradient(ellipse at 75% 25%,rgba(34,211,238,.11) 0%,transparent 50%);
+}
+/* slow sweeping radar line behind the login card */
+.login-bg::after{
+  content:'';position:absolute;top:50%;left:50%;width:150vmax;height:150vmax;
+  transform-origin:0 0;
+  background:conic-gradient(from 0deg,transparent 0deg,rgba(22,199,154,.10) 14deg,transparent 30deg);
+  animation:radar 7s linear infinite;
+}
+@keyframes radar{to{transform:rotate(360deg);}}
+.login-card{position:relative;z-index:1;width:100%;max-width:410px;padding:20px;}
+.login-logo{text-align:center;margin-bottom:34px;}
+.login-logo .icon{
+  width:66px;height:66px;background:linear-gradient(135deg,var(--g2),var(--g3));
+  display:flex;align-items:center;justify-content:center;margin:0 auto 18px;
+  box-shadow:0 0 40px rgba(22,199,154,.4),inset 0 0 20px rgba(255,255,255,.12);
+  clip-path:polygon(22% 0,100% 0,100% 78%,78% 100%,0 100%,0 22%);
+}
+.login-logo .icon svg{width:32px;height:32px;fill:#04120e;}
+.login-logo h1{font-size:19px;font-weight:800;letter-spacing:.4px;}
+.login-logo p{
+  font-size:10px;color:var(--g4);margin-top:7px;letter-spacing:4px;text-transform:uppercase;
+  font-family:'JetBrains Mono',monospace;opacity:.8;
+}
+.login-box{
+  background:var(--surf);backdrop-filter:blur(14px);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:30px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.04);
+}
+.field-label{
+  display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bottom:8px;
+  letter-spacing:2px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;
+}
+.field-input{
+  width:100%;background:var(--field-bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--g4);
+  outline:none;transition:all .18s;
+}
+.field-input:focus{border-color:var(--g3);box-shadow:0 0 0 3px rgba(22,199,154,.12),var(--glow);}
+.pw-wrap{position:relative;}
+.pw-wrap .field-input{padding-right:44px;}
+.pw-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0;}
+.login-btn{
+  width:100%;margin-top:22px;padding:13px;background:linear-gradient(135deg,var(--g2),var(--g3));
+  color:#04120e;border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;
+  font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;
+  transition:all .18s;box-shadow:0 0 18px rgba(22,199,154,.28);
+}
+.login-btn:hover{box-shadow:0 0 30px rgba(22,199,154,.5);transform:translateY(-1px);}
+.login-err{margin-top:12px;font-size:12px;color:var(--red);text-align:center;display:none;font-family:'JetBrains Mono',monospace;}
+.login-footer{text-align:center;font-size:10px;color:var(--dim);margin-top:22px;letter-spacing:1.4px;font-family:'JetBrains Mono',monospace;}
+
+/* APP */
+#main-app{display:none;height:100vh;flex-direction:column;}
+
+/* HEADER */
+.app-header{
+  height:56px;background:var(--panel-hd);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;padding:0 16px;gap:13px;flex-shrink:0;z-index:100;position:relative;
+}
+/* thin animated accent line under the header */
+.app-header::after{
+  content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--g3),var(--cy),transparent);
+  opacity:.55;animation:sweep 6s ease-in-out infinite;
+}
+@keyframes sweep{0%,100%{opacity:.25;transform:translateX(-12%)}50%{opacity:.7;transform:translateX(12%)}}
+.header-logo{
+  width:32px;height:32px;background:linear-gradient(135deg,var(--g2),var(--g3));
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  clip-path:polygon(24% 0,100% 0,100% 76%,76% 100%,0 100%,0 24%);
+  box-shadow:0 0 16px rgba(22,199,154,.4);
+}
+.header-logo svg{width:15px;height:15px;fill:#04120e;}
+.header-brand .name{font-size:12px;font-weight:800;letter-spacing:.3px;line-height:1.3;}
+.header-brand .sub{font-size:9px;color:var(--g4);letter-spacing:2.6px;line-height:1.3;font-family:'JetBrains Mono',monospace;opacity:.75;text-transform:uppercase;}
+.header-spacer{flex:1;}
+/* telemetry readouts in the header bar */
+.telemetry{display:flex;align-items:center;gap:16px;padding:0 14px;border-left:1px solid var(--border);border-right:1px solid var(--border);height:30px;}
+.telem{display:flex;flex-direction:column;gap:1px;line-height:1;}
+.telem-k{font-size:8px;color:var(--dim);letter-spacing:1.4px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;}
+.telem-v{font-size:12px;font-weight:600;color:var(--g4);font-family:'JetBrains Mono',monospace;}
+.live-pill{
+  display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:10px;font-weight:700;
+  letter-spacing:1.6px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;
+  background:rgba(255,59,92,.09);color:var(--red);border:1px solid rgba(255,59,92,.35);
+  transition:all .3s;white-space:nowrap;border-radius:var(--radius-sm);
+}
+.live-pill.live{background:rgba(22,199,154,.11);color:var(--g4);border-color:var(--border2);box-shadow:var(--glow);}
+.live-pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;}
+.live-pill.live .dot{animation:pulse 1.2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.clock{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.5px;}
+.logout-btn{
+  background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 13px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);cursor:pointer;transition:all .18s;
+}
+.logout-btn:hover{border-color:var(--red);color:var(--red);box-shadow:0 0 12px rgba(255,59,92,.2);}
+.icon-btn{width:32px;height:32px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .18s;flex-shrink:0;color:var(--muted);}
+.icon-btn:hover{border-color:var(--g3);color:var(--g4);}
+.icon-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;}
+.menu-btn{display:none;}
+
+/* BODY */
+.app-body{display:flex;flex:1;overflow:hidden;height:calc(100vh - 56px);}
+
+/* SIDEBAR */
+.sidebar{
+  width:290px;min-width:290px;background:var(--panel-side);
+  backdrop-filter:blur(12px);border-right:1px solid var(--border2);
+  display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;
+}
+/* TAB RAIL — replaces the old single endless scroll */
+.tab-rail{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border2);flex-shrink:0;}
+.tab-btn{
+  padding:11px 4px 9px;background:transparent;border:none;border-bottom:2px solid transparent;
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:1.3px;
+  text-transform:uppercase;color:var(--dim);cursor:pointer;transition:all .18s;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+}
+.tab-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.tab-btn:hover{color:var(--muted);background:rgba(22,199,154,.04);}
+.tab-btn.active{color:var(--g4);border-bottom-color:var(--g3);background:rgba(22,199,154,.07);text-shadow:0 0 10px rgba(77,255,195,.45);}
+.tab-panels{flex:1;overflow-y:auto;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;animation:fadeIn .22s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.sidebar-section{padding:15px 16px;border-bottom:1px solid var(--border);}
+.section-hd{
+  font-size:9px;font-weight:700;color:var(--g4);letter-spacing:2.2px;text-transform:uppercase;
+  margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;
+  font-family:'JetBrains Mono',monospace;opacity:.85;
+}
+.section-hd::before{content:'▸ ';color:var(--g3);}
+.api-dot{width:7px;height:7px;border-radius:50%;background:var(--dim);transition:all .3s;}
+.api-dot.ok{background:var(--g3);box-shadow:0 0 10px var(--g3);}
+.api-dot.err{background:var(--red);box-shadow:0 0 10px var(--red);}
+.field-group{display:flex;flex-direction:column;gap:6px;margin-bottom:11px;}
+.field-group label{font-size:9px;font-weight:600;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;}
+.field-group input,.field-group select{
+  background:var(--field-bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--g4);
+  outline:none;width:100%;transition:all .18s;
+}
+.field-group input:focus,.field-group select:focus{border-color:var(--g3);box-shadow:var(--glow);}
+.connect-btn{
+  width:100%;padding:10px;background:linear-gradient(135deg,var(--g2),var(--g3));color:#04120e;
+  border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:12px;
+  font-weight:800;letter-spacing:1.3px;text-transform:uppercase;cursor:pointer;transition:all .18s;
+  box-shadow:0 0 14px rgba(22,199,154,.25);
+}
+.connect-btn:hover{box-shadow:0 0 26px rgba(22,199,154,.45);transform:translateY(-1px);}
+
+/* CAMERA SELECTOR */
+.cam-selector{
+  width:100%;background:var(--field-bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--g4);
+  outline:none;margin-bottom:13px;cursor:pointer;transition:all .18s;
+}
+.cam-selector:focus{border-color:var(--g3);box-shadow:var(--glow);}
+
+/* CLASSES */
+.classes-search input{
+  width:100%;background:var(--field-bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:8px 11px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--g4);outline:none;margin-bottom:8px;transition:all .18s;
+}
+.classes-search input:focus{border-color:var(--g3);box-shadow:var(--glow);}
+.classes-actions{display:flex;gap:6px;margin-bottom:8px;}
+.cls-action-btn{
+  flex:1;padding:6px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:1.1px;
+  text-transform:uppercase;color:var(--muted);cursor:pointer;transition:all .18s;
+}
+.cls-action-btn:hover{border-color:var(--g3);color:var(--g4);box-shadow:var(--glow);}
+.classes-list{max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;}
+.class-item{display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:var(--radius-sm);cursor:pointer;user-select:none;border-left:2px solid transparent;transition:all .14s;}
+.class-item:hover{background:rgba(22,199,154,.07);border-left-color:var(--g3);}
+.class-item input[type=checkbox]{accent-color:var(--g3);width:13px;height:13px;cursor:pointer;}
+.class-item .cls-name{font-size:11.5px;font-weight:500;flex:1;}
+.class-item .cls-id{font-size:9px;color:var(--dim);font-family:'JetBrains Mono',monospace;}
+.cls-group-label{font-size:8.5px;font-weight:700;color:var(--g3);letter-spacing:1.8px;text-transform:uppercase;padding:8px 8px 3px;margin-top:3px;font-family:'JetBrains Mono',monospace;opacity:.7;}
+.apply-cls-btn{
+  width:100%;margin-top:9px;padding:9px;background:rgba(22,199,154,.09);border:1px solid var(--border2);
+  border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:11px;font-weight:800;
+  letter-spacing:1.2px;text-transform:uppercase;color:var(--g4);cursor:pointer;transition:all .18s;
+}
+.apply-cls-btn:hover{background:rgba(22,199,154,.2);border-color:var(--g3);box-shadow:var(--glow);}
+
+/* MODEL */
+.model-options{display:flex;flex-direction:column;gap:5px;}
+.model-opt{
+  display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);cursor:pointer;transition:all .18s;background:var(--surf2);
+  position:relative;overflow:hidden;
+}
+.model-opt::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent;transition:background .18s;}
+.model-opt:hover{border-color:var(--border2);}
+.model-opt.active{border-color:var(--g3);background:rgba(22,199,154,.1);box-shadow:var(--glow);}
+.model-opt.active::before{background:var(--g3);}
+.model-opt input[type=radio]{accent-color:var(--g3);}
+.model-info{flex:1;}
+.model-name{font-size:11.5px;font-weight:700;letter-spacing:.4px;}
+.model-desc{font-size:9.5px;color:var(--muted);}
+.model-badge{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--g3);opacity:.75;}
+
+/* GIMBAL CONTROL — octagonal HUD D-pad */
+.gimbal-pad{display:grid;grid-template-columns:40px 40px 40px;grid-template-rows:40px 40px 40px;grid-template-areas:". up ." "left center right" ". down .";gap:5px;justify-content:center;margin-bottom:12px;}
+.gimbal-btn{
+  background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;
+  transition:all .12s;touch-action:none;color:var(--muted);
+  clip-path:polygon(20% 0,80% 0,100% 20%,100% 80%,80% 100%,20% 100%,0 80%,0 20%);
+}
+.gimbal-btn:hover{border-color:var(--g3);color:var(--g4);background:rgba(22,199,154,.1);}
+.gimbal-btn.pressed{background:var(--g3);border-color:var(--g4);color:#04120e;box-shadow:0 0 22px rgba(22,199,154,.6);transform:scale(.93);}
+.gimbal-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;}
+.gp-up{grid-area:up;}
+.gp-down{grid-area:down;}
+.gp-left{grid-area:left;}
+.gp-right{grid-area:right;}
+.gp-center{grid-area:center;background:var(--surf3);color:var(--g3);}
+.gimbal-zoom{display:flex;gap:6px;}
+.gimbal-zoom-btn{
+  flex:1;padding:9px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.8px;
+  color:var(--muted);cursor:pointer;user-select:none;text-align:center;transition:all .12s;touch-action:none;
+}
+.gimbal-zoom-btn:hover{border-color:var(--g3);color:var(--g4);}
+.gimbal-zoom-btn.pressed{background:var(--g3);border-color:var(--g4);color:#04120e;box-shadow:0 0 18px rgba(22,199,154,.5);}
+
+/* CONFIDENCE / SLIDER READOUTS */
+.conf-val{
+  font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:500;color:var(--g4);
+  text-align:center;margin-bottom:9px;letter-spacing:1px;text-shadow:0 0 16px rgba(77,255,195,.45);
+}
+.conf-labels{display:flex;justify-content:space-between;font-size:8.5px;color:var(--dim);margin-top:7px;letter-spacing:.8px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;}
+input[type=range]{-webkit-appearance:none;width:100%;height:3px;background:var(--border2);border-radius:0;outline:none;}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;background:var(--g3);cursor:pointer;
+  border-radius:50%;box-shadow:0 0 14px rgba(22,199,154,.75);border:2px solid var(--bg);
+}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;background:var(--g3);cursor:pointer;border-radius:50%;border:2px solid var(--bg);}
+
+/* COUNTS */
+.counts-grid{display:flex;flex-direction:column;gap:6px;}
+.count-card{
+  background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 12px;transition:all .18s;position:relative;overflow:hidden;
+}
+.count-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--g3);opacity:.5;}
+.count-card:hover{border-color:var(--border2);box-shadow:var(--glow);}
+.count-card-hd{display:flex;align-items:center;gap:7px;margin-bottom:7px;}
+.count-dot{width:7px;height:7px;border-radius:50%;box-shadow:0 0 8px currentColor;}
+.count-label{font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;}
+.count-rows{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+.count-row{display:flex;flex-direction:column;gap:2px;}
+.count-key{font-size:8.5px;color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;}
+.count-num{font-size:19px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--g4);text-shadow:0 0 12px rgba(77,255,195,.35);}
+
+/* CAMERA MANAGER */
+.camera-list{display:flex;flex-direction:column;gap:5px;margin-bottom:9px;}
+.camera-item{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);transition:all .18s;}
+.camera-item:hover{border-color:var(--border2);}
+.cam-health{width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:all .3s;}
+.cam-health.live{background:var(--g3);box-shadow:0 0 10px var(--g3);}
+.cam-info{flex:1;min-width:0;}
+.cam-name{font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cam-path{font-size:9px;color:var(--dim);font-family:'JetBrains Mono',monospace;letter-spacing:.3px;}
+.cam-actions{display:flex;gap:4px;flex-shrink:0;}
+.cam-btn{width:23px;height:23px;background:var(--surf3);border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .18s;}
+.cam-btn:hover{border-color:var(--g3);box-shadow:var(--glow);}
+.cam-btn svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;}
+.cam-btn:hover svg{stroke:var(--g4);}
+.add-cam-form{background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px;display:none;flex-direction:column;gap:8px;}
+.add-cam-form.open{display:flex;}
+.add-cam-btn{
+  width:100%;padding:8px;background:transparent;border:1px dashed var(--border2);border-radius:var(--radius-sm);
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:1.1px;
+  text-transform:uppercase;color:var(--muted);cursor:pointer;transition:all .18s;
+}
+.add-cam-btn:hover{border-color:var(--g3);color:var(--g4);background:rgba(22,199,154,.06);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.save-cam-btn{padding:8px;background:linear-gradient(135deg,var(--g2),var(--g3));color:#04120e;border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;cursor:pointer;}
+
+/* SESSIONS */
+.sessions-table{width:100%;border-collapse:collapse;font-size:10.5px;font-family:'JetBrains Mono',monospace;}
+.sessions-table th{text-align:left;padding:6px 8px;color:var(--g3);font-weight:600;border-bottom:1px solid var(--border2);font-size:8.5px;letter-spacing:1.3px;text-transform:uppercase;}
+.sessions-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);}
+.sessions-table tr:hover td{color:var(--text);background:rgba(22,199,154,.04);}
+.sessions-wrap{max-height:170px;overflow-y:auto;}
+.csv-btn{
+  width:100%;margin-top:9px;padding:8px;background:var(--surf2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;
+  letter-spacing:1.1px;text-transform:uppercase;color:var(--g4);cursor:pointer;transition:all .18s;
+}
+.csv-btn:hover{border-color:var(--g3);box-shadow:var(--glow);}
+
+/* TOGGLES */
+.theme-toggle{display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .18s;}
+.theme-toggle:hover{border-color:var(--border2);}
+.toggle-track{width:34px;height:18px;background:var(--border2);border-radius:100px;position:relative;transition:all .25s;flex-shrink:0;}
+.toggle-track.on{background:var(--g3);box-shadow:0 0 14px rgba(22,199,154,.55);}
+.toggle-track::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;background:#dff5ec;border-radius:50%;transition:transform .25s;}
+.toggle-track.on::after{transform:translateX(16px);background:#04120e;}
+.theme-label{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.6px;}
+
+/* MAIN CONTENT */
+.main-content{flex:1;overflow:hidden;padding:12px;display:flex;flex-direction:column;gap:10px;}
+
+/* AUTO GRID — fills screen, no scroll */
+.stream-grid{display:grid;gap:8px;flex:1;overflow:hidden;}
+
+/* Grid sizing based on camera count */
+.stream-grid.g1{grid-template-columns:1fr;grid-template-rows:1fr;}
+.stream-grid.g2{grid-template-columns:1fr 1fr;grid-template-rows:1fr;}
+.stream-grid.g3{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr;}
+.stream-grid.g4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;}
+.stream-grid.g5{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;}
+.stream-grid.g6{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;}
+.stream-grid.g7{grid-template-columns:1fr 1fr 1fr 1fr;grid-template-rows:1fr 1fr;}
+.stream-grid.g8{grid-template-columns:1fr 1fr 1fr 1fr;grid-template-rows:1fr 1fr;}
+.stream-grid.g9{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;}
+.stream-grid.g10,.stream-grid.g11,.stream-grid.g12{grid-template-columns:1fr 1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;}
+
+.stream-card{
+  background:var(--surf);backdrop-filter:blur(10px);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0;
+  position:relative;transition:border-color .25s,box-shadow .25s;
+}
+.stream-card:hover{border-color:var(--border2);box-shadow:0 0 30px rgba(22,199,154,.1);}
+/* HUD corner brackets on every video card */
+.stream-card::before,.stream-card::after{
+  content:'';position:absolute;width:14px;height:14px;pointer-events:none;z-index:70;
+  border-color:var(--g3);opacity:.7;
+}
+.stream-card::before{top:32px;left:5px;border-top:2px solid;border-left:2px solid;}
+.stream-card::after{bottom:5px;right:5px;border-bottom:2px solid;border-right:2px solid;}
+.stream-card-header{
+  display:flex;align-items:center;gap:7px;padding:7px 11px;
+  background:var(--panel-card-hd);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.stream-card-health{width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;box-shadow:0 0 8px var(--red);transition:all .3s;}
+.stream-card-health.live{background:var(--g3);box-shadow:0 0 10px var(--g3);animation:pulse 1.6s ease-in-out infinite;}
+.stream-card-name{font-size:10.5px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.7px;text-transform:uppercase;}
+.stream-type-sel{display:flex;gap:3px;}
+.stream-type-btn{
+  padding:3px 10px;border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:9px;
+  font-weight:700;letter-spacing:.9px;cursor:pointer;border:1px solid var(--border);
+  background:var(--surf3);color:var(--muted);transition:all .18s;white-space:nowrap;
+}
+.stream-type-btn:hover{border-color:var(--border2);color:var(--g4);}
+.stream-type-btn.active{background:var(--g3);border-color:var(--g4);color:#04120e;box-shadow:0 0 12px rgba(22,199,154,.45);}
+.stream-card-actions{display:flex;gap:4px;flex-shrink:0;}
+.stream-action{width:23px;height:23px;background:var(--surf3);border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .18s;}
+.stream-action:hover{border-color:var(--g3);box-shadow:var(--glow);}
+.stream-action svg{width:11px;height:11px;stroke:var(--muted);fill:none;stroke-width:2;}
+.stream-action:hover svg{stroke:var(--g4);}
+.stream-action.recording{border-color:var(--red);box-shadow:0 0 12px rgba(255,59,92,.4);animation:pulse 1.4s ease-in-out infinite;}
+.stream-action.recording svg{stroke:var(--red);}
+.video-wrap{position:relative;background:#000;flex:1;min-height:0;overflow:hidden;}
+.video-wrap video{width:100%;height:100%;object-fit:contain;display:block;}
+/* slow scanline sweep across live video — pure decoration, never blocks clicks */
+.video-wrap::after{
+  content:'';position:absolute;left:0;right:0;height:35%;pointer-events:none;z-index:54;
+  background:linear-gradient(180deg,transparent,rgba(77,255,195,.045),transparent);
+  animation:scanline 5.5s linear infinite;
+}
+@keyframes scanline{0%{top:-35%}100%{top:100%}}
+.gimbal-drag-indicator{position:absolute;width:100px;height:100px;border:2px solid rgba(255,255,255,.4);border-radius:50%;pointer-events:none;display:none;z-index:60;box-shadow:0 0 0 2000px rgba(0,0,0,.08);}
+.gimbal-drag-thumb{position:absolute;width:36px;height:36px;background:rgba(64,145,108,.85);border:2px solid white;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
+.gimbal-focus-ring{position:absolute;width:60px;height:60px;border:2px solid var(--g4);border-radius:50%;pointer-events:none;z-index:61;animation:focusRingPulse .7s ease-out forwards;}
+@keyframes focusRingPulse{0%{transform:scale(1.3);opacity:1;}70%{opacity:.8;}100%{transform:scale(0.85);opacity:0;}}
+
+/* AUTO-FOLLOW clickable overlay — targeting-reticle styling */
+.detect-overlay{position:absolute;inset:0;pointer-events:none;z-index:55;}
+.detect-box{position:absolute;pointer-events:auto;cursor:crosshair;border:1.5px solid rgba(77,255,195,.28);border-radius:2px;transition:all .14s;}
+.detect-box:hover{border-color:var(--g4);background:rgba(22,199,154,.14);box-shadow:0 0 18px rgba(77,255,195,.45),inset 0 0 18px rgba(77,255,195,.1);}
+.detect-box .detect-label{
+  position:absolute;top:-19px;left:-1px;font-size:9px;font-weight:700;color:#04120e;
+  background:var(--g4);padding:2px 6px;border-radius:2px;white-space:nowrap;opacity:0;
+  transition:opacity .14s;pointer-events:none;font-family:'JetBrains Mono',monospace;letter-spacing:.6px;text-transform:uppercase;
+}
+.detect-box:hover .detect-label{opacity:1;}
+/* locked target: amber reticle with pulsing corner ticks */
+.detect-box.followed{border-color:var(--amber);border-width:2px;background:rgba(255,179,64,.13);box-shadow:0 0 24px rgba(255,179,64,.5),inset 0 0 20px rgba(255,179,64,.08);animation:lockPulse 1.5s ease-in-out infinite;}
+@keyframes lockPulse{0%,100%{box-shadow:0 0 24px rgba(255,179,64,.5),inset 0 0 20px rgba(255,179,64,.08);}50%{box-shadow:0 0 38px rgba(255,179,64,.75),inset 0 0 26px rgba(255,179,64,.14);}}
+.detect-box.followed .detect-label{opacity:1;background:var(--amber);color:#1a1000;}
+.follow-banner{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:62;display:none;
+  align-items:center;gap:11px;padding:7px 14px;background:var(--header-bg);backdrop-filter:blur(8px);
+  border:1px solid var(--amber);border-radius:var(--radius-sm);box-shadow:0 0 26px rgba(255,179,64,.35);
+}
+.follow-banner .fb-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);animation:pulse 1.2s ease-in-out infinite;}
+.follow-banner .fb-label{font-size:10px;font-weight:700;color:var(--amber);white-space:nowrap;font-family:'JetBrains Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;}
+.follow-banner .fb-stop{
+  padding:4px 12px;background:rgba(255,59,92,.15);border:1px solid var(--red);color:var(--red);
+  border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
+  letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;transition:all .18s;
+}
+.follow-banner .fb-stop:hover{background:rgba(255,59,92,.3);box-shadow:0 0 14px rgba(255,59,92,.4);}
+.video-offline{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0a1114 0%,#04080a 100%);z-index:56;}
+.video-offline svg{width:30px;height:30px;stroke:var(--dim);fill:none;stroke-width:1.5;margin-bottom:11px;opacity:.6;}
+.video-offline p{font-size:10px;color:var(--dim);font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:2px;text-transform:uppercase;}
+.video-offline p.connecting{color:var(--g4);animation:offlinePulse 1.1s ease-in-out infinite;}
+@keyframes offlinePulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* CONTROLS */
+.controls-bar{display:flex;gap:7px;flex-wrap:wrap;flex-shrink:0;}
+.ctrl-btn{
+  display:flex;align-items:center;gap:7px;background:var(--surf);backdrop-filter:blur(8px);
+  border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 15px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);cursor:pointer;transition:all .18s;white-space:nowrap;
+}
+.ctrl-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;}
+.ctrl-btn:hover{border-color:var(--g3);color:var(--g4);box-shadow:var(--glow);transform:translateY(-1px);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(2,5,6,.8);backdrop-filter:blur(6px);z-index:500;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surf);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:var(--radius);padding:26px;width:100%;max-width:360px;box-shadow:var(--shadow);}
+.modal h3{font-size:12px;font-weight:800;margin-bottom:18px;letter-spacing:1.8px;text-transform:uppercase;color:var(--g4);font-family:'JetBrains Mono',monospace;}
+.modal-actions{display:flex;gap:8px;margin-top:18px;}
+.modal-cancel{flex:1;padding:10px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);cursor:pointer;transition:all .18s;}
+.modal-cancel:hover{border-color:var(--border2);color:var(--text);}
+.modal-save{flex:1;padding:10px;background:linear-gradient(135deg,var(--g2),var(--g3));color:#04120e;border:none;border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;}
+
+/* MOBILE */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:56px;bottom:0;z-index:150;transition:transform .3s;box-shadow:var(--shadow);width:88vw;min-width:0;max-width:340px;transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .sidebar-overlay{display:none;position:fixed;inset:0;top:56px;background:rgba(0,0,0,.6);z-index:149;}
+  .sidebar-overlay.show{display:block;}
+  .main-content{padding:8px;gap:8px;}
+  .header-brand .sub{display:none;}
+  .telemetry{display:none;}
+  .clock{display:none;}
+  .menu-btn{display:flex!important;}
+  .stream-grid.g2,.stream-grid.g3,.stream-grid.g4,.stream-grid.g5,.stream-grid.g6{grid-template-columns:1fr;grid-template-rows:repeat(auto-fill,minmax(220px,1fr));}
+  /* Single camera used to stretch to fill the ENTIRE screen below the header, making the
+     page feel like just a video player with no visible way back to the controls. Capping
+     it leaves the header/menu button clearly visible without needing to zoom out first. */
+  .stream-grid.g1{max-height:62vh;}
+
+  /* ── TOUCH TARGETS — every interactive control brought up to a comfortable
+     thumb-sized tap area (~40-46px) instead of the tighter desktop/mouse sizing ── */
+  .icon-btn{width:40px;height:40px;}
+  .cam-btn{width:38px;height:38px;}
+  .cam-btn svg{width:15px;height:15px;}
+  .stream-action{width:38px;height:38px;}
+  .stream-action svg{width:15px;height:15px;}
+  .stream-type-btn{padding:8px 14px;font-size:11px;}
+  .gimbal-zoom-btn{padding:13px;}
+  .gimbal-btn{width:46px!important;height:46px!important;}
+  .gimbal-pad{grid-template-columns:46px 46px 46px;grid-template-rows:46px 46px 46px;}
+  .pw-eye{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;right:6px;}
+  .tab-btn{padding:13px 4px 11px;}
+  .class-item{padding:9px 8px;gap:11px;}
+  .class-item input[type=checkbox]{width:18px;height:18px;}
+  .cls-action-btn{padding:10px;}
+  .theme-toggle{padding:12px 13px;}
+  .fb-stop{padding:7px 14px!important;}
+  .tab-rail{padding-bottom:2px;}
+
+  /* Inputs at 16px+ stop iOS Safari's disorienting auto-zoom-on-focus —
+     desktop keeps its tighter HUD sizing, this only applies under 768px */
+  .field-input,.field-group input,.field-group select,.classes-search input,
+  .cam-selector,input[type=text],input[type=password]{font-size:16px;padding:12px 13px;}
+  .login-box{padding:24px 22px;}
+
+  /* kill the 300ms tap delay on anything clickable, feels much snappier on a phone */
+  button,.tab-btn,.cam-btn,.stream-action,.stream-type-btn,.gimbal-btn,.gimbal-zoom-btn,
+  .class-item,.model-opt,.theme-toggle,.detect-box,.ctrl-btn{touch-action:manipulation;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-bg"></div>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg></div>
+      <h1>Agrocast Analytics Pvt Ltd</h1>
+      <p>Live Streaming XK</p>
+    </div>
+    <div class="login-box">
+      <div style="margin-bottom:16px;">
+        <label class="field-label">Password</label>
+        <div class="pw-wrap">
+          <input class="field-input" type="password" id="password" placeholder="Enter password">
+          <button class="pw-eye" onclick="togglePwd()">👁</button>
+        </div>
+      </div>
+      <button class="login-btn" onclick="doLogin()">Sign in →</button>
+      <div class="login-err" id="login-err">Incorrect password. Try again.</div>
+    </div>
+    <p class="login-footer">Agrocast Analytics Pvt Ltd · Authorized access only</p>
+  </div>
+</div>
+
+<!-- RENAME MODAL -->
+<div class="modal-overlay" id="rename-modal">
+  <div class="modal">
+    <h3>Rename Camera</h3>
+    <label class="field-label">Camera Name</label>
+    <input class="field-input" type="text" id="rename-input" placeholder="e.g. Gate Camera">
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeRename()">Cancel</button>
+      <button class="modal-save" onclick="saveRename()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- MAIN APP -->
+<div id="main-app">
+  <header class="app-header">
+    <button class="icon-btn menu-btn" onclick="toggleSidebar()">
+      <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="header-logo"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg></div>
+    <div class="header-brand">
+      <span class="name">Agrocast Analytics Pvt Ltd</span>
+      <span class="sub">Live Streaming XK</span>
+    </div>
+    <div class="header-spacer"></div>
+    <div class="telemetry">
+      <div class="telem"><span class="telem-k">Cams</span><span class="telem-v" id="telem-cams">0</span></div>
+      <div class="telem"><span class="telem-k">Links</span><span class="telem-v" id="telem-links">0</span></div>
+      <div class="telem"><span class="telem-k">UTC</span><span class="telem-v" id="clock">--:--:--</span></div>
+    </div>
+    <div class="live-pill" id="main-status"><div class="dot"></div><span id="main-status-text">Offline</span></div>
+
+    <button class="logout-btn" onclick="logout()">Sign out</button>
+  </header>
+
+  <div class="app-body">
+    <aside class="sidebar" id="sidebar">
+      <!-- TAB RAIL -->
+      <div class="tab-rail">
+        <button class="tab-btn active" id="tabbtn-connect" onclick="switchTab('connect',this)">
+          <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>Link
+        </button>
+        <button class="tab-btn" id="tabbtn-detect" onclick="switchTab('detect',this)">
+          <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Detect
+        </button>
+        <button class="tab-btn" id="tabbtn-gimbal" onclick="switchTab('gimbal',this)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/></svg>Gimbal
+        </button>
+        <button class="tab-btn" id="tabbtn-data" onclick="switchTab('data',this)">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Data
+        </button>
+      </div>
+
+      <div class="tab-panels">
+      <div class="tab-panel active" id="tab-connect">
+
+      <!-- CONNECTION -->
+      <div class="sidebar-section">
+        <div class="section-hd">Connection <div class="api-dot" id="api-dot"></div></div>
+        <div class="field-group"><label>Server IP</label><input type="text" id="server-ip" value="" placeholder="Enter server IP"></div>
+        <div class="field-group"><label>API Key</label><input type="text" id="api-key" value="" placeholder="Enter your API key"></div>
+        <button class="connect-btn" onclick="connectAll()">Connect All Cameras</button>
+      </div>
+
+      <!-- CAMERA MANAGER -->
+      <div class="sidebar-section">
+        <div class="section-hd">Cameras</div>
+        <div class="camera-list" id="camera-list"></div>
+        <button class="add-cam-btn" onclick="toggleAddCam()">+ Add Camera</button>
+        <div class="add-cam-form" id="add-cam-form">
+          <div class="field-group"><label>Camera Name</label><input type="text" id="cam-name" placeholder="e.g. Gate Camera"></div>
+          <div class="form-row">
+            <div class="field-group"><label>Stream Path</label><input type="text" id="cam-stream" placeholder="gate"></div>
+            <div class="field-group"><label>AI Path</label><input type="text" id="cam-ai" placeholder="gate_ai"></div>
+          </div>
+          <button class="save-cam-btn" onclick="addCamera()">Add Camera</button>
+        </div>
+      </div>
+
+      <!-- THEME -->
+      <div class="sidebar-section">
+        <div class="section-hd">Appearance</div>
+        <div class="theme-toggle" onclick="toggleTheme()">
+          <div class="toggle-track" id="theme-track"></div>
+          <span class="theme-label" id="theme-label">Dark mode</span>
+        </div>
+      </div>
+
+      </div><!-- /tab-connect -->
+      <div class="tab-panel" id="tab-detect">
+
+      <!-- CAMERA CONFIG SELECTOR -->
+      <div class="sidebar-section">
+        <div class="section-hd">Configure Camera</div>
+        <select class="cam-selector" id="config-cam-selector" onchange="onConfigCamChange()">
+          <option value="">No cameras added yet</option>
+        </select>
+
+        <!-- DETECTION CLASSES -->
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">Detection Classes</div>
+        <div class="classes-search"><input type="text" placeholder="Search classes..." id="cls-search" oninput="filterClasses()"></div>
+        <div class="classes-actions">
+          <button class="cls-action-btn" onclick="selectAllClasses()">Select All</button>
+          <button class="cls-action-btn" onclick="clearAllClasses()">Clear All</button>
+        </div>
+        <div class="classes-list" id="classes-list"></div>
+        <button class="apply-cls-btn" onclick="applyClasses()">Apply Classes →</button>
+
+        <!-- MODEL -->
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin:12px 0 8px;">YOLO Model</div>
+        <div class="model-options">
+          <label class="model-opt active" id="model-opt-n" onclick="setModel('yolov8n.pt',this)">
+            <input type="radio" name="model" checked>
+            <div class="model-info"><div class="model-name">Fast</div><div class="model-desc">Moving drone, wide area</div></div>
+            <span class="model-badge">n·30fps</span>
+          </label>
+          <label class="model-opt" id="model-opt-s" onclick="setModel('yolov8s.pt',this)">
+            <input type="radio" name="model">
+            <div class="model-info"><div class="model-name">Balanced</div><div class="model-desc">Default, good accuracy</div></div>
+            <span class="model-badge">s·20fps</span>
+          </label>
+          <label class="model-opt" id="model-opt-m" onclick="setModel('yolov8m.pt',this)">
+            <input type="radio" name="model">
+            <div class="model-info"><div class="model-name">Accurate</div><div class="model-desc">Close range, stationary</div></div>
+            <span class="model-badge">m·15fps</span>
+          </label>
+          <label class="model-opt" id="model-opt-x" onclick="setModel('yolov8x.pt',this)">
+            <input type="radio" name="model">
+            <div class="model-info"><div class="model-name">Best</div><div class="model-desc">Maximum accuracy</div></div>
+            <span class="model-badge">x·10fps</span>
+          </label>
+        </div>
+
+        <!-- CONFIDENCE -->
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin:12px 0 8px;">Confidence</div>
+        <div class="conf-val" id="conf-display">0.25</div>
+        <input type="range" min="0.05" max="0.90" step="0.05" value="0.25" id="conf-slider" oninput="updateConf(this.value)" onchange="pushConf()">
+        <div class="conf-labels"><span>More detections</span><span>More accurate</span></div>
+
+        <!-- AUTO-FOLLOW ON/OFF -->
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin:14px 0 8px;">Auto-Follow</div>
+        <div class="theme-toggle" onclick="toggleFollowEnabled()">
+          <div class="toggle-track on" id="follow-enabled-track"></div>
+          <span class="theme-label" id="follow-enabled-label">Enabled</span>
+        </div>
+
+        <!-- AUTO-FOLLOW SPEED -->
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin:14px 0 8px;">Follow Speed</div>
+        <div class="conf-val" id="follow-speed-display">12</div>
+        <input type="range" min="4" max="40" step="1" value="12" id="follow-speed-slider" oninput="updateFollowSpeed(this.value)" onchange="pushFollowSpeed()">
+        <div class="conf-labels"><span>Gentle (won't lose still)</span><span>Fast (tracks runners)</span></div>
+      </div>
+
+      </div><!-- /tab-detect -->
+      <div class="tab-panel" id="tab-gimbal">
+
+      <!-- GIMBAL CONTROL -->
+      <div class="sidebar-section">
+        <div class="section-hd">Gimbal Control</div>
+        <div class="gimbal-pad">
+          <button class="gimbal-btn gp-up" title="Tilt up"
+            onpointerdown="gimbalPress('up',this)" onpointerup="gimbalRelease('up',this)" onpointerleave="gimbalRelease('up',this)" onpointercancel="gimbalRelease('up',this)">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+          <button class="gimbal-btn gp-left" title="Pan left"
+            onpointerdown="gimbalPress('left',this)" onpointerup="gimbalRelease('left',this)" onpointerleave="gimbalRelease('left',this)" onpointercancel="gimbalRelease('left',this)">
+            <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          </button>
+          <button class="gimbal-btn gp-center" title="Center gimbal" onclick="gimbalCenter()">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+          </button>
+          <button class="gimbal-btn gp-right" title="Pan right"
+            onpointerdown="gimbalPress('right',this)" onpointerup="gimbalRelease('right',this)" onpointerleave="gimbalRelease('right',this)" onpointercancel="gimbalRelease('right',this)">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+          <button class="gimbal-btn gp-down" title="Tilt down"
+            onpointerdown="gimbalPress('down',this)" onpointerup="gimbalRelease('down',this)" onpointerleave="gimbalRelease('down',this)" onpointercancel="gimbalRelease('down',this)">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </button>
+        </div>
+        <div class="gimbal-zoom">
+          <button class="gimbal-zoom-btn" title="Zoom out"
+            onpointerdown="gimbalPress('zoomout',this)" onpointerup="gimbalRelease('zoomout',this)" onpointerleave="gimbalRelease('zoomout',this)" onpointercancel="gimbalRelease('zoomout',this)">− Zoom Out</button>
+          <button class="gimbal-zoom-btn" title="Zoom in"
+            onpointerdown="gimbalPress('zoomin',this)" onpointerup="gimbalRelease('zoomin',this)" onpointerleave="gimbalRelease('zoomin',this)" onpointercancel="gimbalRelease('zoomin',this)">+ Zoom In</button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;">Zoom Level</span>
+          <span style="font-size:13px;font-weight:700;color:var(--g4);font-family:'JetBrains Mono',monospace;" id="gimbal-zoom-readout">1.0x</span>
+        </div>
+        <input type="range" min="1" max="30" step="0.1" value="1" id="gimbal-zoom-slider" oninput="onGimbalZoomSlide(this.value)" onchange="onGimbalZoomCommit(this.value)">
+        <button class="gimbal-zoom-btn" style="width:100%;margin-top:10px;" title="Refocus on center of frame" onclick="gimbalAutoFocus()">◎ Auto Focus</button>
+        <div style="font-size:10px;color:var(--dim);margin-top:6px;line-height:1.4;">Tap the video to focus on that point</div>
+
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin:14px 0 8px;">Auto-Follow</div>
+        <div style="font-size:10px;color:var(--dim);line-height:1.4;">Click a detected object on the video to make the camera follow it. Move the gimbal manually to release.</div>
+
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin:14px 0 8px;">Presets</div>
+        <div id="gimbal-presets-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px;">
+          <div style="font-size:11px;color:var(--dim);text-align:center;padding:6px;">No presets saved yet</div>
+        </div>
+        <button class="add-cam-btn" onclick="gimbalSaveCurrentPreset()">+ Save Current Position</button>
+      </div>
+
+      </div><!-- /tab-gimbal -->
+      <div class="tab-panel" id="tab-data">
+
+      <!-- LIVE COUNTS -->
+      <div class="sidebar-section">
+        <div class="section-hd">Live Counts</div>
+        <select class="cam-selector" id="counts-cam-selector" onchange="renderCountsForCamera()" style="margin-bottom:10px;">
+          <option value="all">All Cameras (combined)</option>
+        </select>
+        <div class="counts-grid" id="counts-grid">
+          <div style="font-size:12px;color:var(--dim);text-align:center;padding:10px;">Connect a stream to see counts</div>
+        </div>
+      </div>
+
+      <!-- SESSIONS -->
+      <div class="sidebar-section">
+        <div class="section-hd">Session <span id="session-status-badge" style="font-size:10px;padding:2px 8px;border-radius:100px;background:rgba(64,145,108,.15);color:var(--g4);border:1px solid var(--g3);display:none;">● RECORDING</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <button id="start-session-btn" onclick="startSession()" style="flex:1;padding:8px;background:linear-gradient(135deg,var(--g2),var(--g3));color:white;border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">▶ Start Session</button>
+          <button id="stop-session-btn" onclick="stopSession()" style="flex:1;padding:8px;background:rgba(230,57,70,.15);border:1px solid var(--red);color:var(--red);border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:none;">■ Stop & Save</button>
+        </div>
+        <select class="cam-selector" id="sessions-cam-selector" onchange="renderSessions()" style="margin-bottom:8px;">
+          <option value="all">All Cameras</option>
+        </select>
+        <div class="sessions-wrap"><table class="sessions-table"><thead><tr><th>Camera</th><th>Time</th><th>Model</th></tr></thead><tbody id="sessions-body"><tr><td colspan="3" style="color:var(--dim);text-align:center;padding:10px;">No sessions yet</td></tr></tbody></table></div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button class="csv-btn" onclick="downloadCSV()" style="flex:2;">↓ Download CSV</button>
+          <button onclick="clearAllSessions()" style="flex:1;padding:7px;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:11px;color:var(--dim);cursor:pointer;">Clear All</button>
+        </div>
+      </div>
+
+      </div><!-- /tab-data -->
+      </div><!-- /tab-panels -->
+    </aside>
+
+    <main class="main-content">
+      <div class="stream-grid g1" id="stream-grid"></div>
+      <div class="controls-bar">
+        <button class="ctrl-btn" onclick="snapshotAll()">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Snapshot All
+        </button>
+        <button class="ctrl-btn" onclick="reconnectAll()">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Reconnect All
+        </button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const PASSWORD='Agrocast';
+let currentIP='';
+let currentKey='';
+let cameras=[];
+let streamPCs={};
+let camStreamType={};
+let recorders={};
+let sessions=[];
+let renameCamId=null;
+let isLightTheme=false;
+let selectedCamId=''; // set after cameras load
+
+// Per-camera config state
+let camConfigs={};  // {cam_id: {conf, model, classes}}
+
+const COCO_GROUPS={
+  "People & Vehicles":[{id:0,name:"person"},{id:1,name:"bicycle"},{id:2,name:"car"},{id:3,name:"motorcycle"},{id:4,name:"airplane"},{id:5,name:"bus"},{id:6,name:"train"},{id:7,name:"truck"},{id:8,name:"boat"}],
+  "Animals":[{id:14,name:"bird"},{id:15,name:"cat"},{id:16,name:"dog"},{id:17,name:"horse"},{id:18,name:"sheep"},{id:19,name:"cow"},{id:20,name:"elephant"},{id:21,name:"bear"},{id:22,name:"zebra"},{id:23,name:"giraffe"}],
+  "Electronics":[{id:62,name:"tv"},{id:63,name:"laptop"},{id:64,name:"mouse"},{id:65,name:"remote"},{id:66,name:"keyboard"},{id:67,name:"cell phone"},{id:68,name:"microwave"},{id:69,name:"oven"}],
+  "Furniture":[{id:56,name:"chair"},{id:57,name:"couch"},{id:58,name:"potted plant"},{id:59,name:"bed"},{id:60,name:"dining table"},{id:61,name:"toilet"},{id:72,name:"refrigerator"}],
+  "Accessories":[{id:24,name:"backpack"},{id:25,name:"umbrella"},{id:26,name:"handbag"},{id:27,name:"tie"},{id:28,name:"suitcase"},{id:39,name:"bottle"},{id:75,name:"vase"}],
+  "Sports & Outdoor":[{id:29,name:"frisbee"},{id:30,name:"skis"},{id:32,name:"sports ball"},{id:33,name:"kite"},{id:34,name:"baseball bat"},{id:36,name:"skateboard"},{id:37,name:"surfboard"},{id:38,name:"tennis racket"}],
+  "Kitchen & Food":[{id:40,name:"wine glass"},{id:41,name:"cup"},{id:42,name:"fork"},{id:43,name:"knife"},{id:44,name:"spoon"},{id:45,name:"bowl"},{id:46,name:"banana"},{id:47,name:"apple"},{id:55,name:"cake"}],
+  "Other":[{id:9,name:"traffic light"},{id:10,name:"fire hydrant"},{id:11,name:"stop sign"},{id:13,name:"bench"},{id:73,name:"book"},{id:74,name:"clock"},{id:76,name:"scissors"},{id:77,name:"teddy bear"}]
+};
+
+// ── LOGIN ──
+document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+function togglePwd(){const i=document.getElementById('password');i.type=i.type==='password'?'text':'password';}
+function doLogin(){
+  if(document.getElementById('password').value===PASSWORD){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('main-app').style.display='flex';
+    window.scrollTo(0,0);
+    initApp();
+  } else {
+    const e=document.getElementById('login-err');e.style.display='block';setTimeout(()=>e.style.display='none',3000);
+  }
+}
+function logout(){
+  Object.values(streamPCs).forEach(pc=>{try{pc.close();}catch(e){}});
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('main-app').style.display='none';
+  document.getElementById('password').value='';
+}
+
+// ── INIT ──
+function initApp(){
+  
+  buildClassesList();
+  renderStreamGrid(); // show empty state
+  // DO NOT load cameras on startup — wait for user to enter IP and click Connect
+}
+function updateClock(){document.getElementById('clock').textContent=new Date().toUTCString().slice(17,25)+' UTC';}
+
+// ── MOBILE ──
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebar-overlay').classList.toggle('show');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('show');}
+
+// ── CAMERAS ──
+async function loadCameras(){
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_cameras`);
+    if(r.ok){cameras=await r.json();setApiStatus(true);}
+    else{setApiStatus(false);useFallback();}
+  }catch(e){setApiStatus(false);useFallback();}
+  cameras.forEach(c=>{if(!camStreamType[c.id])camStreamType[c.id]='raw';});
+  renderCameraList();
+  renderStreamGrid();
+  updateConfigCamSelector();
+}
+function useFallback(){cameras=[];}
+
+function renderCameraList(){
+  document.getElementById('camera-list').innerHTML=cameras.map(c=>`
+    <div class="camera-item">
+      <div class="cam-health ${streamPCs[c.id]?'live':''}" id="health-${c.id}"></div>
+      <div class="cam-info"><div class="cam-name">${c.name}</div><div class="cam-path">${c.stream}/${c.ai_stream}</div></div>
+      <div class="cam-actions">
+        <button class="cam-btn" onclick="openRename('${c.id}','${c.name}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="cam-btn" onclick="removeCamera('${c.id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </div>
+    </div>`).join('');
+}
+
+// ── AUTO GRID ──
+function getGridClass(n){
+  if(n<=1)return'g1';if(n===2)return'g2';if(n===3)return'g3';
+  if(n===4)return'g4';if(n===5)return'g5';if(n===6)return'g6';
+  if(n===7)return'g7';if(n===8)return'g8';if(n===9)return'g9';
+  return'g10';
+}
+
+function renderStreamGrid(){
+  const grid=document.getElementById('stream-grid');
+  if(!cameras.length){
+    grid.className='stream-grid g1';
+    grid.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--dim);gap:12px;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 10l4.553-2.277A1 1 0 0121 8.68v6.64a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+      <div style="font-size:16px;font-weight:700;">No cameras added</div>
+      <div style="font-size:13px;">Add a camera from the sidebar to get started</div>
+    </div>`;
+    return;
+  }
+  const n=cameras.length||1;
+  grid.className=`stream-grid ${getGridClass(n)}`;
+  grid.innerHTML=cameras.map(c=>{
+    const isAI=camStreamType[c.id]==='ai';
+    return`<div class="stream-card" id="card-${c.id}">
+      <div class="stream-card-header">
+        <div class="stream-card-health" id="card-health-${c.id}"></div>
+        <span class="stream-card-name">${c.name}</span>
+        <div class="stream-type-sel">
+          <button class="stream-type-btn ${!isAI?'active':''}" onclick="switchStream('${c.id}','raw')">Live</button>
+          <button class="stream-type-btn ${isAI?'active':''}" onclick="switchStream('${c.id}','ai')">AI</button>
+        </div>
+        <div class="stream-card-actions">
+          <button class="stream-action" onclick="toggleCamRecord('${c.id}')" id="rec-${c.id}" title="Record"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></button>
+          <button class="stream-action" onclick="snapshot('${c.id}')" title="Snapshot"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+          <button class="stream-action" onclick="toggleOverlay('${c.id}')" id="overlay-${c.id}" title="Toggle Overlay" style="font-size:10px;font-weight:700;color:var(--g4);">OSD</button>
+          <button class="stream-action" onclick="fullscreen('${c.id}')" title="Fullscreen"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></button>
+        </div>
+      </div>
+      <div class="video-wrap">
+        <video id="video-${c.id}" autoplay muted playsinline></video>
+        <div class="detect-overlay" id="detect-overlay-${c.id}"></div>
+        <div class="follow-banner" id="follow-banner-${c.id}"><div class="fb-dot"></div><span class="fb-label">Following</span><button class="fb-stop" onclick="stopFollow('${c.id}')">Stop</button></div>
+        <div class="gimbal-drag-indicator" id="gimbal-drag-${c.id}"><div class="gimbal-drag-thumb"></div></div>
+        <div class="video-offline" id="offline-${c.id}">
+          <svg viewBox="0 0 24 24"><path d="M8.1 13.34l2.83-2.83L3.91 3.5 2.5 4.91l5.6 8.43zm9.07-4.21c1.09.73 1.97 1.7 2.57 2.84l-2 2c-.46-.82-1.07-1.53-1.8-2.09l1.23-2.75z"/></svg>
+          <p id="offline-text-${c.id}">Stream offline</p>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  cameras.forEach(c=>connectCamera(c));
+  cameras.forEach(c=>attachGimbalDrag(c.id));
+}
+
+// ── STREAM TYPE ──
+function switchStream(camId,type){
+  camStreamType[camId]=type;
+  const card=document.getElementById('card-'+camId);
+  if(card) card.querySelectorAll('.stream-type-btn').forEach(btn=>{
+    btn.classList.toggle('active',(type==='raw'&&btn.textContent==='Live')||(type==='ai'&&btn.textContent==='AI'));
+  });
+  const cam=cameras.find(c=>c.id===camId);
+  if(cam)connectCamera(cam);
+}
+
+// ── CONNECT ──
+async function connectCamera(cam){
+  const ip=document.getElementById('server-ip').value.trim()||currentIP;
+  const type=camStreamType[cam.id]||'raw';
+  const path=type==='ai'?cam.ai_stream:cam.stream;
+  const url=`/proxy.php?target=${ip}&apikey=${currentKey}&port=8889&path=${path}/whep`;
+  const video=document.getElementById('video-'+cam.id);
+  if(!video)return;
+  if(streamPCs[cam.id]){try{streamPCs[cam.id].close();}catch(e){}delete streamPCs[cam.id];}
+  const offlineText=document.getElementById('offline-text-'+cam.id);
+  if(offlineText){offlineText.textContent='Connecting…';offlineText.classList.add('connecting');}
+  try{
+    const pc=new RTCPeerConnection({iceServers:[
+      {urls:'stun:stun.l.google.com:19302'}
+      // TURN server removed 2026-07-30: pointed at 13.233.127.84, the OLD/original
+      // AWS account's server, which no longer exists post-migration. A dead TURN
+      // candidate can add real ICE-negotiation delay on networks that need relay,
+      // for zero benefit. No TURN is provisioned on the current infra - re-add here
+      // if a coturn instance is stood up on the new streaming server.
+    ]});
+    streamPCs[cam.id]=pc;
+    const ms=new MediaStream();video.srcObject=ms;
+    pc.ontrack=evt=>{ms.addTrack(evt.track);video.play().catch(()=>{});setStreamLive(cam.id,true);};
+    pc.oniceconnectionstatechange=()=>{
+      if(pc.iceConnectionState==='disconnected'||pc.iceConnectionState==='failed'){
+        setStreamLive(cam.id,false);setTimeout(()=>connectCamera(cam),5000);
+      }
+    };
+    pc.addTransceiver('video',{direction:'recvonly'});pc.addTransceiver('audio',{direction:'recvonly'});
+    const offer=await pc.createOffer();await pc.setLocalDescription(offer);
+    await new Promise(res=>{
+      if(pc.iceGatheringState==='complete'){res();return;}
+      pc.onicegatheringstatechange=()=>{if(pc.iceGatheringState==='complete')res();};
+      setTimeout(res,3000);
+    });
+    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/sdp'},body:pc.localDescription.sdp});
+    if(!resp.ok)throw new Error('WHEP '+resp.status);
+    await pc.setRemoteDescription({type:'answer',sdp:await resp.text()});
+  }catch(e){setStreamLive(cam.id,false);setTimeout(()=>connectCamera(cam),6000);}
+}
+
+function setStreamLive(camId,live){
+  const offline=document.getElementById('offline-'+camId);
+  const offlineText=document.getElementById('offline-text-'+camId);
+  const health=document.getElementById('card-health-'+camId);
+  const listH=document.getElementById('health-'+camId);
+  if(offline)offline.style.display=live?'none':'flex';
+  if(offlineText&&!live){offlineText.textContent='Stream offline';offlineText.classList.remove('connecting');}
+  if(health)health.className='stream-card-health'+(live?' live':'');
+  if(listH)listH.className='cam-health'+(live?' live':'');
+  const anyLive=cameras.some(c=>document.getElementById('offline-'+c.id)?.style.display==='none');
+  document.getElementById('main-status-text').textContent=anyLive?'Live':'Offline';
+  document.getElementById('main-status').className='live-pill'+(anyLive?' live':'');
+}
+
+let countInterval=null;let sessionInterval=null;let gimbalStatusInterval=null;let detectionsInterval=null;let followStatusInterval=null;
+function connectAll(){
+  const ip=document.getElementById('server-ip').value.trim();
+  const key=document.getElementById('api-key').value.trim();
+  if(!ip){alert('Please enter a server IP first.');return;}
+  if(!key){alert('Please enter your API key.');return;}
+  currentIP=ip;
+  currentKey=key;
+  cameras=[];
+  loadCameras();
+  loadAllConfigs();
+  // Start polling counts and sessions
+  if(countInterval)clearInterval(countInterval);
+  if(sessionInterval)clearInterval(sessionInterval);
+  if(gimbalStatusInterval)clearInterval(gimbalStatusInterval);
+  if(detectionsInterval)clearInterval(detectionsInterval);
+  if(followStatusInterval)clearInterval(followStatusInterval);
+  countInterval=setInterval(fetchCounts,2000);
+  sessionInterval=setInterval(fetchSessions,10000);
+  gimbalStatusInterval=setInterval(fetchGimbalStatus,1500);
+  detectionsInterval=setInterval(fetchDetections,250);   // clickable box overlay (4Hz)
+  followStatusInterval=setInterval(fetchFollowStatus,1500); // keep the "Following" banner in sync
+  fetchCounts();
+  fetchSessions();
+  checkSessionStatus();
+}
+function reconnectAll(){cameras.forEach(c=>connectCamera(c));}
+
+// ── CAMERA CONFIG SELECTOR ──
+function updateConfigCamSelector(){
+  // Update config camera selector
+  const sel=document.getElementById('config-cam-selector');
+  sel.innerHTML=cameras.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  // Auto select first camera if none selected
+  if(!selectedCamId || !cameras.find(c=>c.id===selectedCamId)){
+    selectedCamId=cameras.length?cameras[0].id:'';
+  }
+  sel.value=selectedCamId;
+  loadConfigForCamera(selectedCamId);
+  fetchGimbalPresets();
+
+  // Update counts camera selector
+  const countsSel=document.getElementById('counts-cam-selector');
+  if(countsSel){
+    const cur=countsSel.value;
+    countsSel.innerHTML=`<option value="all">All Cameras (combined)</option>`+cameras.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    countsSel.value=cameras.find(c=>c.id===cur)?cur:'all';
+  }
+
+  // Update sessions camera selector
+  const sessSel=document.getElementById('sessions-cam-selector');
+  if(sessSel){
+    const cur2=sessSel.value;
+    sessSel.innerHTML=`<option value="all">All Cameras</option>`+cameras.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    sessSel.value=cameras.find(c=>c.id===cur2)?cur2:'all';
+  }
+}
+
+function onConfigCamChange(){
+  selectedCamId=document.getElementById('config-cam-selector').value;
+  loadConfigForCamera(selectedCamId);
+  fetchGimbalPresets();
+  fetchGimbalStatus();
+  followState={following:false,targetId:null};
+  updateFollowBanner();
+  fetchFollowStatus();
+  fetchDetections();
+}
+
+function loadConfigForCamera(camId){
+  const cfg=camConfigs[camId]||{conf:0.25,model:'yolov8s.pt',classes:{"0":"person","56":"chair","63":"laptop"}};
+  // Update confidence slider
+  document.getElementById('conf-slider').value=cfg.conf;
+  document.getElementById('conf-display').textContent=parseFloat(cfg.conf).toFixed(2);
+  // Update follow-speed slider (defaults to 12 if the camera has no saved value yet)
+  const fs=cfg.follow_speed||12;
+  document.getElementById('follow-speed-slider').value=fs;
+  document.getElementById('follow-speed-display').textContent=parseInt(fs);
+  // Update auto-follow enabled toggle (defaults to enabled if the camera has no saved value yet)
+  followEnabled=cfg.follow_enabled!==false;
+  renderFollowEnabledToggle();
+  // Update model
+  document.querySelectorAll('.model-opt').forEach(m=>m.classList.remove('active'));
+  const modelKey=cfg.model.replace('yolov8','').replace('.pt','');
+  const modelEl=document.getElementById('model-opt-'+modelKey);
+  if(modelEl)modelEl.classList.add('active');
+  // Update classes checkboxes
+  document.querySelectorAll('.class-item input[type=checkbox]').forEach(cb=>{
+    const id=parseInt(cb.id.replace('cls-',''));
+    cb.checked=cfg.classes&&cfg.classes[id]!==undefined;
+  });
+}
+
+async function loadAllConfigs(){
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_all_configs`);
+    if(r.ok){camConfigs=await r.json();loadConfigForCamera(selectedCamId);}
+  }catch(e){}
+}
+
+// ── CLASSES ──
+function buildClassesList(){
+  const list=document.getElementById('classes-list');
+  list.innerHTML='';
+  Object.entries(COCO_GROUPS).forEach(([group,items])=>{
+    const gl=document.createElement('div');gl.className='cls-group-label';gl.textContent=group;list.appendChild(gl);
+    items.forEach(item=>{
+      const div=document.createElement('div');div.className='class-item';div.dataset.name=item.name;div.dataset.id=item.id;
+      const cfg=camConfigs[selectedCamId]||{};
+      const chk=cfg.classes&&cfg.classes[item.id]!==undefined?'checked':'';
+      div.innerHTML=`<input type="checkbox" id="cls-${item.id}" ${chk} onchange="toggleClass(${item.id},'${item.name}')"><label for="cls-${item.id}" class="cls-name">${item.name}</label><span class="cls-id">#${item.id}</span>`;
+      list.appendChild(div);
+    });
+  });
+}
+function filterClasses(){
+  const q=document.getElementById('cls-search').value.toLowerCase();
+  document.querySelectorAll('.class-item').forEach(el=>{el.style.display=el.dataset.name.includes(q)?'flex':'none';});
+}
+function toggleClass(id,name){
+  if(!camConfigs[selectedCamId])camConfigs[selectedCamId]={conf:0.25,model:'yolov8s.pt',classes:{}};
+  if(camConfigs[selectedCamId].classes[id])delete camConfigs[selectedCamId].classes[id];
+  else camConfigs[selectedCamId].classes[id]=name;
+}
+function selectAllClasses(){
+  if(!camConfigs[selectedCamId])camConfigs[selectedCamId]={conf:0.25,model:'yolov8s.pt',classes:{}};
+  Object.values(COCO_GROUPS).flat().forEach(item=>{camConfigs[selectedCamId].classes[item.id]=item.name;});
+  document.querySelectorAll('.class-item input').forEach(cb=>cb.checked=true);
+}
+function clearAllClasses(){
+  if(!camConfigs[selectedCamId])camConfigs[selectedCamId]={conf:0.25,model:'yolov8s.pt',classes:{}};
+  camConfigs[selectedCamId].classes={};
+  document.querySelectorAll('.class-item input').forEach(cb=>cb.checked=false);
+}
+async function applyClasses(){
+  if(!selectedCamId){alert('Please select a camera first.');return;}
+  // Read directly from checkboxes — most reliable source of truth
+  const classes={};
+  document.querySelectorAll('.class-item input[type=checkbox]:checked').forEach(cb=>{
+    const id=parseInt(cb.id.replace('cls-',''));
+    const name=Object.values(COCO_GROUPS).flat().find(i=>i.id===id)?.name||String(id);
+    classes[id]=name;
+  });
+  if(!camConfigs[selectedCamId])camConfigs[selectedCamId]={conf:0.25,model:'yolov8s.pt',classes:{}};
+  camConfigs[selectedCamId].classes=classes;
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_config`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,classes:classes})});
+    setApiStatus(true);
+    alert(`Applied ${Object.keys(classes).length} classes to ${selectedCamId}`);
+  }catch(e){setApiStatus(false);}
+}
+
+// ── MODEL ──
+async function setModel(m,el){
+  document.querySelectorAll('.model-opt').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+  if(!camConfigs[selectedCamId])camConfigs[selectedCamId]={conf:0.25,model:m,classes:{}};
+  camConfigs[selectedCamId].model=m;
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_config`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,model:m})});
+    setApiStatus(true);
+  }catch(e){setApiStatus(false);}
+}
+
+// ── CONFIDENCE ──
+function updateConf(val){
+  document.getElementById('conf-display').textContent=parseFloat(val).toFixed(2);
+  if(!camConfigs[selectedCamId])camConfigs[selectedCamId]={conf:parseFloat(val),model:'yolov8s.pt',classes:{}};
+  camConfigs[selectedCamId].conf=parseFloat(val);
+}
+async function pushConf(){
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_config`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,conf:camConfigs[selectedCamId]?.conf||0.25})});
+    setApiStatus(true);
+  }catch(e){setApiStatus(false);}
+}
+
+// ── AUTO-FOLLOW SPEED (live operator control) ──
+function updateFollowSpeed(val){
+  document.getElementById('follow-speed-display').textContent=parseInt(val);
+}
+async function pushFollowSpeed(){
+  const val=parseInt(document.getElementById('follow-speed-slider').value);
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_config`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,follow_speed:val})});
+    setApiStatus(true);
+  }catch(e){setApiStatus(false);}
+}
+
+// ── AUTO-FOLLOW ON/OFF (hard switch — off means clicking a box does nothing, and
+// detection.py independently refuses to act on any target while this is off) ──
+let followEnabled=true;
+function renderFollowEnabledToggle(){
+  document.getElementById('follow-enabled-track').classList.toggle('on',followEnabled);
+  document.getElementById('follow-enabled-label').textContent=followEnabled?'Enabled':'Disabled';
+}
+async function toggleFollowEnabled(){
+  followEnabled=!followEnabled;
+  renderFollowEnabledToggle();
+  if(!followEnabled&&followState.following){
+    await stopFollow();  // turning off while actively following -> cleanly release the target
+  }
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_config`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,follow_enabled:followEnabled})});
+    setApiStatus(true);
+  }catch(e){setApiStatus(false);}
+}
+
+// ── GIMBAL CONTROL ──
+const GIMBAL_SPEED=60; // -100..100
+const GIMBAL_MIN_PULSE_MS=250; // guarantee quick taps hold long enough for the poll loop to see them
+const GIMBAL_DRAG_MAX_PX=100; // px of drag needed to reach full speed
+const GIMBAL_DRAG_DEADZONE_PX=22; // was 6 - far too tight for touch: a finger tap's contact
+  // patch normally shifts more than 6px on its own, so real taps-to-focus were being
+  // misclassified as drags (sending a small pan/tilt nudge and skipping focus entirely).
+  // 22px comfortably absorbs normal touch jitter while still leaving 78px of travel to
+  // reach full drag speed (GIMBAL_DRAG_MAX_PX=100).
+let gimbalPressed=new Set();
+let gimbalPressStart={};
+let gimbalInterval=null;
+let gimbalDragActive=false, gimbalDragPan=0, gimbalDragTilt=0;
+
+function gimbalRecompute(){
+  if(gimbalDragActive){
+    let zoom=0;
+    if(gimbalPressed.has('zoomin'))zoom=1;
+    if(gimbalPressed.has('zoomout'))zoom=-1;
+    return{pan:gimbalDragPan,tilt:gimbalDragTilt,zoom};
+  }
+  let pan=0,tilt=0,zoom=0;
+  if(gimbalPressed.has('left'))pan-=GIMBAL_SPEED;
+  if(gimbalPressed.has('right'))pan+=GIMBAL_SPEED;
+  if(gimbalPressed.has('up'))tilt+=GIMBAL_SPEED;
+  if(gimbalPressed.has('down'))tilt-=GIMBAL_SPEED;
+  if(gimbalPressed.has('zoomin'))zoom=1;
+  if(gimbalPressed.has('zoomout'))zoom=-1;
+  return{pan,tilt,zoom};
+}
+
+// ── DRAG-TO-MOVE (press and drag on the video, like the RC's own touchscreen) ──
+function attachGimbalDrag(camId){
+  const video=document.getElementById('video-'+camId);
+  const wrap=video?video.parentElement:null;
+  const indicator=document.getElementById('gimbal-drag-'+camId);
+  if(!video||!wrap||video.dataset.gimbalDragAttached)return;
+  video.dataset.gimbalDragAttached='1';
+  video.style.touchAction='none';
+  video.style.cursor='grab';
+
+  let dragging=false,startX=0,startY=0,pointerId=null,maxMoveDist=0;
+
+  function setIndicator(x,y,dx,dy){
+    if(!indicator)return;
+    indicator.style.left=(x-50)+'px';
+    indicator.style.top=(y-50)+'px';
+    indicator.style.display='block';
+    const thumb=indicator.querySelector('.gimbal-drag-thumb');
+    const cx=Math.max(-50,Math.min(50,dx));
+    const cy=Math.max(-50,Math.min(50,dy));
+    thumb.style.transform=`translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;
+  }
+  function hideIndicator(){ if(indicator)indicator.style.display='none'; }
+
+  video.addEventListener('pointerdown',(e)=>{
+    if(!selectedCamId){alert('Select a camera first.');return;}
+    if(camId!==selectedCamId)return;
+    dragging=true; pointerId=e.pointerId; maxMoveDist=0;
+    const rect=wrap.getBoundingClientRect();
+    startX=e.clientX-rect.left; startY=e.clientY-rect.top;
+    gimbalDragActive=true; gimbalDragPan=0; gimbalDragTilt=0;
+    video.setPointerCapture(e.pointerId);
+    video.style.cursor='grabbing';
+    setIndicator(startX,startY,0,0);
+    gimbalSend();
+    if(!gimbalInterval)gimbalInterval=setInterval(gimbalSend,150);
+  });
+  video.addEventListener('pointermove',(e)=>{
+    if(!dragging||e.pointerId!==pointerId)return;
+    const rect=wrap.getBoundingClientRect();
+    const curX=e.clientX-rect.left, curY=e.clientY-rect.top;
+    const dx=curX-startX, dy=curY-startY;
+    maxMoveDist=Math.max(maxMoveDist,Math.hypot(dx,dy));
+    if(maxMoveDist>=GIMBAL_DRAG_DEADZONE_PX)cancelFollowOnManual(); // a real manual drag takes over from follow
+    let pan=(dx/GIMBAL_DRAG_MAX_PX)*100;
+    let tilt=-(dy/GIMBAL_DRAG_MAX_PX)*100; // drag up = tilt up, matches D-pad "up"
+    if(Math.abs(dx)<GIMBAL_DRAG_DEADZONE_PX)pan=0;
+    if(Math.abs(dy)<GIMBAL_DRAG_DEADZONE_PX)tilt=0;
+    gimbalDragPan=Math.max(-100,Math.min(100,pan));
+    gimbalDragTilt=Math.max(-100,Math.min(100,tilt));
+    setIndicator(startX,startY,dx,dy);
+  });
+  function endDrag(e){
+    if(!dragging||(e&&e.pointerId!==pointerId))return;
+    dragging=false;
+    const wasTap=maxMoveDist<GIMBAL_DRAG_DEADZONE_PX;
+    const tapX=startX, tapY=startY;
+    gimbalDragActive=false; gimbalDragPan=0; gimbalDragTilt=0;
+    video.style.cursor='grab';
+    hideIndicator();
+    gimbalSend();
+    if(gimbalPressed.size===0&&gimbalInterval){clearInterval(gimbalInterval);gimbalInterval=null;}
+    if(wasTap)gimbalFocusAt(camId,video,tapX,tapY);
+  }
+  video.addEventListener('pointerup',endDrag);
+  video.addEventListener('pointercancel',endDrag);
+}
+function showFocusRing(wrap,x,y){
+  const ring=document.createElement('div');
+  ring.className='gimbal-focus-ring';
+  ring.style.left=(x-30)+'px';
+  ring.style.top=(y-30)+'px';
+  wrap.appendChild(ring);
+  setTimeout(()=>ring.remove(),700);
+}
+async function gimbalFocusAt(camId,video,cssX,cssY){
+  if(!currentIP||!currentKey||camId!==selectedCamId)return;
+  const vw=video.videoWidth||1920, vh=video.videoHeight||1080;
+  const rect=video.getBoundingClientRect();
+  // video uses object-fit:contain — map click within the letterboxed video area to native pixel coords
+  const scale=Math.min(rect.width/vw,rect.height/vh);
+  const offsetX=(rect.width-vw*scale)/2, offsetY=(rect.height-vh*scale)/2;
+  const touchX=Math.round((cssX-offsetX)/scale);
+  const touchY=Math.round((cssY-offsetY)/scale);
+  if(touchX<0||touchY<0||touchX>vw||touchY>vh)return; // tapped in the letterbox padding, not the actual frame
+  showFocusRing(video.parentElement,cssX,cssY);
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=gimbal_focus`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:camId,touch_x:touchX,touch_y:touchY})
+    });
+  }catch(e){}
+}
+async function gimbalAutoFocus(){
+  if(!currentIP||!currentKey||!selectedCamId){alert('Select a camera first.');return;}
+  const video=document.getElementById('video-'+selectedCamId);
+  const vw=(video&&video.videoWidth)||1920, vh=(video&&video.videoHeight)||1080;
+  if(video)showFocusRing(video.parentElement,video.clientWidth/2,video.clientHeight/2);
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=gimbal_focus`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,touch_x:Math.round(vw/2),touch_y:Math.round(vh/2)})
+    });
+  }catch(e){}
+}
+
+// ── ZOOM SLIDER ──
+let gimbalZoomSlideTimer=null;
+let gimbalZoomUserActive=false;
+function onGimbalZoomSlide(val){
+  document.getElementById('gimbal-zoom-readout').textContent=parseFloat(val).toFixed(1)+'x';
+  gimbalZoomUserActive=true;
+  if(gimbalZoomSlideTimer)clearTimeout(gimbalZoomSlideTimer);
+  gimbalZoomSlideTimer=setTimeout(()=>sendGimbalZoomTarget(val),150);
+}
+function onGimbalZoomCommit(val){
+  if(gimbalZoomSlideTimer)clearTimeout(gimbalZoomSlideTimer);
+  sendGimbalZoomTarget(val);
+  setTimeout(()=>{gimbalZoomUserActive=false;},1000);
+}
+async function sendGimbalZoomTarget(val){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_gimbal_zoom_target`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,zoom:parseFloat(val)})
+    });
+  }catch(e){}
+}
+async function fetchGimbalStatus(){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_gimbal_status&camera_id=${selectedCamId}`);
+    if(!r.ok)return;
+    const st=await r.json();
+    if(st.zoom!=null&&!gimbalZoomUserActive){
+      document.getElementById('gimbal-zoom-slider').value=st.zoom;
+      document.getElementById('gimbal-zoom-readout').textContent=parseFloat(st.zoom).toFixed(1)+'x';
+    }
+  }catch(e){}
+}
+
+// ── PRESETS ──
+async function gimbalSaveCurrentPreset(){
+  if(!currentIP||!currentKey||!selectedCamId){alert('Select a camera first.');return;}
+  const name=prompt('Name this preset (e.g. "Front Gate"):');
+  if(!name)return;
+  const presetId='preset_'+Date.now();
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=gimbal_request_save_preset`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,preset_id:presetId,name})
+    });
+    setTimeout(fetchGimbalPresets,1200); // give gimbal_control.py time to query+report the angle
+  }catch(e){}
+}
+async function gimbalRecallPreset(presetId){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=gimbal_recall_preset`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,preset_id:presetId})
+    });
+  }catch(e){}
+}
+async function gimbalRemovePreset(presetId){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  if(!confirm('Delete this preset?'))return;
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=remove_gimbal_preset`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,preset_id:presetId})
+    });
+  }catch(e){}
+  fetchGimbalPresets();
+}
+async function fetchGimbalPresets(){
+  const list=document.getElementById('gimbal-presets-list');
+  if(!currentIP||!currentKey||!selectedCamId||!list)return;
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_gimbal_presets&camera_id=${selectedCamId}`);
+    if(!r.ok)return;
+    const presets=await r.json();
+    const ids=Object.keys(presets);
+    if(!ids.length){
+      list.innerHTML='<div style="font-size:11px;color:var(--dim);text-align:center;padding:6px;">No presets saved yet</div>';
+      return;
+    }
+    list.innerHTML=ids.map(id=>{
+      const p=presets[id];
+      return `<div class="camera-item">
+        <div class="cam-info"><div class="cam-name">${p.name}</div></div>
+        <div class="cam-actions">
+          <button class="cam-btn" title="Go to preset" onclick="gimbalRecallPreset('${id}')"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+          <button class="cam-btn" title="Delete preset" onclick="gimbalRemovePreset('${id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){}
+}
+
+// ── AUTO-FOLLOW ──
+let followState={following:false,targetId:null};
+let currentDetections={boxes:[],w:1920,h:1080};
+
+async function fetchDetections(){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_detections&camera_id=${selectedCamId}`);
+    if(!r.ok)return;
+    currentDetections=await r.json();
+    renderDetectionOverlay();
+  }catch(e){}
+}
+async function fetchFollowStatus(){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_follow_status&camera_id=${selectedCamId}`);
+    if(!r.ok)return;
+    const st=await r.json();
+    followState.following=!!st.following;
+    followState.targetId=st.target?st.target.track_id:null;
+    updateFollowBanner();
+    renderDetectionOverlay();
+  }catch(e){}
+}
+function renderDetectionOverlay(){
+  const overlay=document.getElementById('detect-overlay-'+selectedCamId);
+  const video=document.getElementById('video-'+selectedCamId);
+  if(!overlay||!video)return;
+  // clear overlays on every OTHER camera card (only the selected one gets boxes)
+  cameras.forEach(c=>{if(c.id!==selectedCamId){const o=document.getElementById('detect-overlay-'+c.id);if(o)o.innerHTML='';}});
+  const boxes=currentDetections.boxes||[];
+  const vw=currentDetections.w||1920, vh=currentDetections.h||1080;
+  const dispW=video.clientWidth, dispH=video.clientHeight;
+  if(!dispW||!dispH){overlay.innerHTML='';return;}
+  const scale=Math.min(dispW/vw,dispH/vh);
+  const offX=(dispW-vw*scale)/2, offY=(dispH-vh*scale)/2;
+  overlay.innerHTML=boxes.map(b=>{
+    const left=offX+b.x*vw*scale;
+    const top=offY+b.y*vh*scale;
+    const w=b.w*vw*scale;
+    const h=b.h*vh*scale;
+    const isFollowed=followState.following&&followState.targetId===b.id;
+    return `<div class="detect-box ${isFollowed?'followed':''}" style="left:${left}px;top:${top}px;width:${w}px;height:${h}px;" onclick="onDetectBoxClick(${b.id},${b.cls})">
+      <span class="detect-label">${b.label}${isFollowed?' • following':''}</span></div>`;
+  }).join('');
+}
+async function onDetectBoxClick(trackId,classId){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  if(!followEnabled)return;  // hard OFF — clicking a box does nothing while auto-follow is disabled
+  followState.following=true;followState.targetId=trackId;
+  updateFollowBanner();renderDetectionOverlay();
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_follow_target`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId,track_id:trackId,class_id:classId})
+    });
+  }catch(e){}
+}
+async function stopFollow(camId){
+  const cam=camId||selectedCamId;
+  followState.following=false;followState.targetId=null;
+  updateFollowBanner();renderDetectionOverlay();
+  if(!currentIP||!currentKey||!cam)return;
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=stop_follow`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:cam})
+    });
+  }catch(e){}
+}
+// any manual gimbal input cancels follow (operator takes over)
+function cancelFollowOnManual(){ if(followState.following) stopFollow(); }
+function updateFollowBanner(){
+  cameras.forEach(c=>{
+    const banner=document.getElementById('follow-banner-'+c.id);
+    if(!banner)return;
+    const show=followState.following&&c.id===selectedCamId;
+    banner.style.display=show?'flex':'none';
+    if(show){
+      const label=banner.querySelector('.fb-label');
+      if(label)label.textContent='Following object #'+(followState.targetId!=null?followState.targetId:'');
+    }
+  });
+}
+
+function gimbalSend(){
+  if(!currentIP||!currentKey||!selectedCamId)return;
+  const{pan,tilt,zoom}=gimbalRecompute();
+  fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_gimbal_cmd`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({camera_id:selectedCamId,pan,tilt,zoom})
+  }).catch(()=>{});
+}
+function gimbalPress(dir,btn){
+  if(!selectedCamId){alert('Select a camera first.');return;}
+  if(dir==='left'||dir==='right'||dir==='up'||dir==='down')cancelFollowOnManual();
+  gimbalPressed.add(dir);
+  gimbalPressStart[dir]=Date.now();
+  if(btn)btn.classList.add('pressed');
+  gimbalSend();
+  if(!gimbalInterval)gimbalInterval=setInterval(gimbalSend,150);
+}
+function gimbalRelease(dir,btn){
+  if(!gimbalPressed.has(dir))return; // avoid duplicate stop-sends from leave+up firing together
+  const pressedAt=gimbalPressStart[dir]||0;
+  const elapsed=Date.now()-pressedAt;
+  const doRelease=()=>{
+    if(gimbalPressStart[dir]!==pressedAt)return; // a new press for this dir started before this delayed release fired
+    gimbalPressed.delete(dir);
+    if(btn)btn.classList.remove('pressed');
+    gimbalSend();
+    if(gimbalPressed.size===0&&gimbalInterval){clearInterval(gimbalInterval);gimbalInterval=null;}
+  };
+  if(elapsed<GIMBAL_MIN_PULSE_MS)setTimeout(doRelease,GIMBAL_MIN_PULSE_MS-elapsed);
+  else doRelease();
+}
+async function gimbalCenter(){
+  if(!currentIP||!currentKey||!selectedCamId){alert('Select a camera first.');return;}
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=gimbal_center`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:selectedCamId})
+    });
+  }catch(e){}
+}
+// Safety: if the tab loses focus while a button is held (alt-tab, etc.), release everything
+window.addEventListener('blur',()=>{
+  if(gimbalPressed.size){
+    gimbalPressed.clear();
+    document.querySelectorAll('.gimbal-btn.pressed,.gimbal-zoom-btn.pressed').forEach(b=>b.classList.remove('pressed'));
+    gimbalSend();
+    if(gimbalInterval){clearInterval(gimbalInterval);gimbalInterval=null;}
+  }
+});
+
+// ── COUNTS ──
+let latestCounts={};
+
+async function fetchCounts(){
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_counts`);
+    if(!r.ok){setApiStatus(false);return;}
+    setApiStatus(true);
+    latestCounts=await r.json();
+    renderCountsForCamera();
+  }catch(e){setApiStatus(false);}
+}
+
+function renderCountsForCamera(){
+  const sel=document.getElementById('counts-cam-selector');
+  const selectedCam=sel?sel.value:'all';
+  const grid=document.getElementById('counts-grid');
+  const colors={0:'#e63946',56:'#f4a261',63:'#4895ef'};
+
+  // Filter data by selected camera
+  let filteredData={};
+  if(selectedCam==='all'){
+    filteredData=latestCounts;
+  } else {
+    if(latestCounts[selectedCam]) filteredData={[selectedCam]:latestCounts[selectedCam]};
+  }
+
+  const allCids=new Set();
+  Object.values(filteredData).forEach(d=>Object.keys(d).forEach(k=>allCids.add(k)));
+  if(!allCids.size){grid.innerHTML='<div style="font-size:12px;color:var(--dim);text-align:center;padding:10px;">No active detections</div>';return;}
+  let html='';
+  allCids.forEach(cid=>{
+    const label=Object.values(filteredData)[0]?.[cid]?.label||`class ${cid}`;
+    const color=colors[cid]||'#74c69d';
+    let inFrame=0,total=0,unique=0;
+    Object.values(filteredData).forEach(d=>{if(d[cid]){inFrame+=d[cid].in_frame||0;total+=d[cid].total||0;unique+=d[cid].unique||0;}});
+    html+=`<div class="count-card"><div class="count-card-hd"><div class="count-dot" style="background:${color}"></div><span class="count-label" style="color:${color}">${label}</span></div><div class="count-rows"><div class="count-row"><span class="count-key">In frame</span><span class="count-num">${inFrame}</span></div><div class="count-row"><span class="count-key">Total</span><span class="count-num">${total}</span></div><div class="count-row"><span class="count-key">Unique</span><span class="count-num" style="color:var(--cy);text-shadow:0 0 12px rgba(34,211,238,.4);">${unique}</span></div></div></div>`;
+  });
+  grid.innerHTML=html;
+}
+
+// ── SESSIONS ──
+async function fetchSessions(){
+  try{const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_sessions`);if(r.ok){sessions=await r.json();renderSessions();}}catch(e){}
+}
+function renderSessions(){
+  const tbody=document.getElementById('sessions-body');
+  const sel=document.getElementById('sessions-cam-selector');
+  const selectedCam=sel?sel.value:'all';
+  const filtered=selectedCam==='all'?sessions:sessions.filter(s=>s.camera_id===selectedCam);
+  if(!filtered.length){tbody.innerHTML='<tr><td colspan="3" style="color:var(--dim);text-align:center;padding:10px;">No sessions yet</td></tr>';return;}
+  tbody.innerHTML=filtered.slice(0,20).map(s=>{
+    const t=new Date(s.start*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return`<tr><td>${s.camera||'—'}</td><td>${t}</td><td style="font-family:'JetBrains Mono',monospace">${(s.model||'').replace('yolov8','v8').replace('.pt','')}</td></tr>`;
+  }).join('');
+}
+// ── SESSION CONTROL ──
+let sessionRunning = false;
+let sessionStartTime = 0;
+let sessionTimer = null;
+
+async function startSession(){
+  if(!currentIP||!currentKey){alert('Connect to a server first.');return;}
+  try{
+    const r = await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=start_session`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})
+    });
+    if(r.ok){
+      sessionRunning = true;
+      sessionStartTime = Date.now();
+      document.getElementById('start-session-btn').style.display='none';
+      document.getElementById('stop-session-btn').style.display='block';
+      document.getElementById('session-status-badge').style.display='inline';
+      // Reset local counts display
+      latestCounts={};
+      renderCountsForCamera();
+    }
+  }catch(e){alert('Failed to start session.');}
+}
+
+async function stopSession(){
+  if(!currentIP||!currentKey)return;
+  // Gather current config
+  const cam = cameras[0];
+  const cfg = cam ? camConfigs[cam.id]||{} : {};
+  try{
+    const r = await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=stop_session`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        camera: cam?.name||'All Cameras',
+        camera_id: cam?.id||'',
+        model: cfg.model||'yolov8s.pt',
+        conf: cfg.conf||0.25,
+        classes: Object.values(cfg.classes||{})
+      })
+    });
+    if(r.ok){
+      sessionRunning = false;
+      document.getElementById('start-session-btn').style.display='block';
+      document.getElementById('stop-session-btn').style.display='none';
+      document.getElementById('session-status-badge').style.display='none';
+      fetchSessions();
+      alert('Session saved!');
+    }
+  }catch(e){alert('Failed to stop session.');}
+}
+
+async function clearAllSessions(){
+  if(!confirm('Delete all saved sessions?'))return;
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=clear_sessions`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})
+    });
+    sessions=[];
+    renderSessions();
+  }catch(e){}
+}
+
+// Check session status on connect
+async function checkSessionStatus(){
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=get_session_status`);
+    if(r.ok){
+      const d=await r.json();
+      if(d.active){
+        sessionRunning=true;
+        document.getElementById('start-session-btn').style.display='none';
+        document.getElementById('stop-session-btn').style.display='block';
+        document.getElementById('session-status-badge').style.display='inline';
+      }
+    }
+  }catch(e){}
+}
+
+function downloadCSV(){
+  const sel=document.getElementById('sessions-cam-selector');
+  const selectedCam=sel?sel.value:'all';
+  const filtered=selectedCam==='all'?sessions:sessions.filter(s=>s.camera_id===selectedCam);
+  if(!filtered.length){alert('No sessions to download.');return;}
+  const camLabel=selectedCam==='all'?'all':cameras.find(c=>c.id===selectedCam)?.name||selectedCam;
+  const h=['Session ID','Camera','Start','End','Model','Conf','Classes','Counts'];
+  const rows=filtered.map(s=>[s.id,s.camera,new Date(s.start*1000).toLocaleString(),new Date(s.end*1000).toLocaleString(),s.model,s.conf,(s.classes||[]).join('; '),JSON.stringify(s.counts||{})]);
+  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`agrocast_${camLabel}_sessions_${Date.now()}.csv`;a.click();
+}
+
+// ── CAMERA MANAGER ──
+function toggleAddCam(){document.getElementById('add-cam-form').classList.toggle('open');}
+async function addCamera(){
+  const name=document.getElementById('cam-name').value.trim();
+  const stream=document.getElementById('cam-stream').value.trim();
+  const ai=document.getElementById('cam-ai').value.trim()||stream+'_ai';
+  if(!name||!stream){alert('Name and stream path required.');return;}
+  // Server computes the authoritative id as "cam_"+stream — use that, don't invent a local one
+  const camId='cam_'+stream;
+  const newCam={id:camId,name,stream,ai_stream:ai,added_at:Date.now()/1000};
+  cameras.push(newCam);
+  camStreamType[newCam.id]='raw';
+  camConfigs[newCam.id]={conf:0.25,model:'yolov8s.pt',classes:{}};
+  try{
+    const r=await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=add_camera`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,stream,ai_stream:ai})});
+    if(r.ok){
+      const data=await r.json();
+      if(data.camera&&data.camera.id&&data.camera.id!==camId){
+        // Defensive: if server ever disagrees, adopt its id as truth
+        const idx=cameras.findIndex(c=>c.id===camId);
+        if(idx>=0)cameras[idx].id=data.camera.id;
+        camStreamType[data.camera.id]=camStreamType[camId];
+        camConfigs[data.camera.id]=camConfigs[camId];
+      }
+    }
+  }catch(e){}
+  document.getElementById('cam-name').value='';document.getElementById('cam-stream').value='';document.getElementById('cam-ai').value='';
+  document.getElementById('add-cam-form').classList.remove('open');
+  renderCameraList();renderStreamGrid();updateConfigCamSelector();
+}
+async function removeCamera(id){
+  if(!confirm('Remove this camera?'))return;
+  cameras=cameras.filter(c=>c.id!==id);
+  try{await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=remove_camera`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});}catch(e){}
+  if(streamPCs[id]){try{streamPCs[id].close();}catch(e){}delete streamPCs[id];}
+  renderCameraList();renderStreamGrid();updateConfigCamSelector();
+}
+function openRename(id,name){renameCamId=id;document.getElementById('rename-input').value=name;document.getElementById('rename-modal').classList.add('open');}
+function closeRename(){renameCamId=null;document.getElementById('rename-modal').classList.remove('open');}
+async function saveRename(){
+  const name=document.getElementById('rename-input').value.trim();
+  if(!name||!renameCamId)return;
+  const cam=cameras.find(c=>c.id===renameCamId);if(cam)cam.name=name;
+  try{await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=rename_camera`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:renameCamId,name})});}catch(e){}
+  closeRename();renderCameraList();renderStreamGrid();updateConfigCamSelector();
+}
+
+// ── RECORDING ──
+function toggleCamRecord(camId){if(recorders[camId])stopCamRecord(camId);else startCamRecord(camId);}
+function startCamRecord(camId){
+  const video=document.getElementById('video-'+camId);if(!video)return;
+  const canvas=document.createElement('canvas');canvas.width=1920;canvas.height=1080;
+  const ctx=canvas.getContext('2d');let active=true;
+  const draw=()=>{if(!active)return;ctx.drawImage(video,0,0,1920,1080);requestAnimationFrame(draw);};
+  const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp8','video/webm',''];
+  const mime=mimes.find(m=>m===''||MediaRecorder.isTypeSupported(m))||'';
+  const mr=new MediaRecorder(canvas.captureStream(30),mime?{mimeType:mime}:{});
+  const chunks=[];
+  mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+  mr.onstop=()=>{
+    active=false;
+    const blob=new Blob(chunks,{type:mime||'video/webm'});
+    const cam=cameras.find(c=>c.id===camId);
+    const ext=mime.includes('mp4')?'mp4':'webm';
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${cam?.name||camId}_${Date.now()}.${ext}`;a.click();
+    delete recorders[camId];
+    const btn=document.getElementById('rec-'+camId);if(btn)btn.classList.remove('recording');
+  };
+  mr.start(1000);draw();recorders[camId]={mr,chunks};
+  const btn=document.getElementById('rec-'+camId);if(btn)btn.classList.add('recording');
+}
+function stopCamRecord(camId){if(recorders[camId]?.mr?.state!=='inactive')recorders[camId]?.mr?.stop();}
+
+// ── SNAPSHOT ──
+
+
+// ── OVERLAY TOGGLE ──
+let overlayHidden={};
+async function toggleOverlay(camId){
+  overlayHidden[camId]=!overlayHidden[camId];
+  const hidden=overlayHidden[camId];
+  const btn=document.getElementById('overlay-'+camId);
+  if(btn){
+    btn.style.color=hidden?'var(--dim)':'var(--g4)';
+    btn.style.textDecoration=hidden?'line-through':'none';
+  }
+  // Tell detection.py to show/hide overlay via API
+  try{
+    await fetch(`/proxy.php?target=${currentIP}&apikey=${currentKey}&path=set_overlay`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({camera_id:camId, overlay:!hidden})
+    });
+  }catch(e){}
+}
+
+function snapshot(camId){
+  const v=document.getElementById('video-'+camId);
+  const c=document.createElement('canvas');c.width=v.videoWidth||1920;c.height=v.videoHeight||1080;
+  c.getContext('2d').drawImage(v,0,0);
+  const cam=cameras.find(x=>x.id===camId);
+  const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download=`${cam?.name||camId}_${Date.now()}.png`;a.click();
+}
+function snapshotAll(){cameras.forEach(c=>snapshot(c.id));}
+
+// ── FULLSCREEN ──
+function fullscreen(camId){
+  const v=document.getElementById('video-'+camId);
+  if(!document.fullscreenElement)v.requestFullscreen().catch(()=>{});else document.exitFullscreen();
+}
+
+// ── THEME ──
+function toggleTheme(){
+  isLightTheme=!isLightTheme;
+  document.documentElement.setAttribute('data-theme',isLightTheme?'light':'');
+  document.getElementById('theme-track').className='toggle-track'+(isLightTheme?' on':'');
+  document.getElementById('theme-label').textContent=isLightTheme?'Light mode':'Dark mode';
+}
+
+// ── API STATUS ──
+function setApiStatus(ok){const dot=document.getElementById('api-dot');if(dot)dot.className='api-dot'+(ok?' ok':' err');}
+
+// ── SIDEBAR TABS ──
+function switchTab(name,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  const panel=document.getElementById('tab-'+name);
+  if(panel)panel.classList.add('active');
+  if(btn)btn.classList.add('active');
+}
+
+// ── HEADER TELEMETRY ── (read-only: derives from existing state, drives nothing)
+setInterval(()=>{
+  const c=document.getElementById('telem-cams');
+  const l=document.getElementById('telem-links');
+  const k=document.getElementById('clock');
+  if(c)c.textContent=cameras.length;
+  if(l)l.textContent=cameras.filter(x=>document.getElementById('offline-'+x.id)?.style.display==='none').length;
+  if(k)k.textContent=new Date().toUTCString().slice(17,25);
+},1000);
+</script>
+</body>
+</html>
